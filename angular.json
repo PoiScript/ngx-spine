@@ -1,0 +1,163 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "ngx-spine": {
+      "projectType": "library",
+      "root": "projects/ngx-spine",
+      "sourceRoot": "projects/ngx-spine/src",
+      "prefix": "ngx-spine",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-ng-packagr:build",
+          "options": {
+            "tsConfig": "projects/ngx-spine/tsconfig.lib.json",
+            "project": "projects/ngx-spine/ng-package.json",
+            "scripts": []
+          }
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "main": "projects/ngx-spine/src/test.ts",
+            "tsConfig": "projects/ngx-spine/tsconfig.spec.json",
+            "karmaConfig": "projects/ngx-spine/karma.conf.js"
+          }
+        },
+        "lint": {
+          "builder": "@angular-devkit/build-angular:tslint",
+          "options": {
+            "tsConfig": [
+              "projects/ngx-spine/tsconfig.lib.json",
+              "projects/ngx-spine/tsconfig.spec.json"
+            ],
+            "exclude": [
+              "**/node_modules/**"
+            ]
+          }
+        }
+      }
+    },
+    "ngx-spine-demos": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "projects/ngx-spine-demos",
+      "sourceRoot": "projects/ngx-spine-demos/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:browser",
+          "options": {
+            "outputPath": "dist/ngx-spine-demos",
+            "index": "projects/ngx-spine-demos/src/index.html",
+            "main": "projects/ngx-spine-demos/src/main.ts",
+            "polyfills": "projects/ngx-spine-demos/src/polyfills.ts",
+            "tsConfig": "projects/ngx-spine-demos/tsconfig.app.json",
+            "aot": false,
+            "assets": [
+              "projects/ngx-spine-demos/src/favicon.ico",
+              "projects/ngx-spine-demos/src/assets"
+            ],
+            "styles": [
+              "projects/ngx-spine-demos/src/styles.css"
+            ],
+            "scripts": [
+              "./node_modules/spine-runtimes/spine-ts/build/spine-webgl.js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "fileReplacements": [
+                {
+                  "replace": "projects/ngx-spine-demos/src/environments/environment.ts",
+                  "with": "projects/ngx-spine-demos/src/environments/environment.prod.ts"
+                }
+              ],
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false,
+              "extractCss": true,
+              "namedChunks": false,
+              "aot": true,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "buildOptimizer": true,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kb",
+                  "maximumError": "10kb"
+                }
+              ]
+            }
+          }
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "browserTarget": "ngx-spine-demos:build"
+          },
+          "configurations": {
+            "production": {
+              "browserTarget": "ngx-spine-demos:build:production"
+            }
+          }
+        },
+        "extract-i18n": {
+          "builder": "@angular-devkit/build-angular:extract-i18n",
+          "options": {
+            "browserTarget": "ngx-spine-demos:build"
+          }
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "main": "projects/ngx-spine-demos/src/test.ts",
+            "polyfills": "projects/ngx-spine-demos/src/polyfills.ts",
+            "tsConfig": "projects/ngx-spine-demos/tsconfig.spec.json",
+            "karmaConfig": "projects/ngx-spine-demos/karma.conf.js",
+            "assets": [
+              "projects/ngx-spine-demos/src/favicon.ico",
+              "projects/ngx-spine-demos/src/assets"
+            ],
+            "styles": [
+              "projects/ngx-spine-demos/src/styles.css"
+            ],
+            "scripts": []
+          }
+        },
+        "lint": {
+          "builder": "@angular-devkit/build-angular:tslint",
+          "options": {
+            "tsConfig": [
+              "projects/ngx-spine-demos/tsconfig.app.json",
+              "projects/ngx-spine-demos/tsconfig.spec.json",
+              "projects/ngx-spine-demos/e2e/tsconfig.json"
+            ],
+            "exclude": [
+              "**/node_modules/**"
+            ]
+          }
+        },
+        "e2e": {
+          "builder": "@angular-devkit/build-angular:protractor",
+          "options": {
+            "protractorConfig": "projects/ngx-spine-demos/e2e/protractor.conf.js",
+            "devServerTarget": "ngx-spine-demos:serve"
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "ngx-spine-demos:serve:production"
+            }
+          }
+        }
+      }
+    }},
+  "defaultProject": "ngx-spine"
+}
