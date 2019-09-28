@@ -1,0 +1,20 @@
+language: nodejs
+
+cache:
+  yarn: true
+
+script:
+  - yarn ng build ngx-spine-demos --prod
+
+deploy:
+  provider: pages
+  skip_cleanup: true
+  github_token: $GITHUB_TOKEN
+  local_dir: ./dist/ngx-spine-demos/
+  on:
+    branch: master
+
+notifications:
+  email:
+    on_failure: change
+    on_success: change
