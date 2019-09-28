@@ -1,19 +1,19 @@
 import { async, ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { NgxSpineComponent } from "./ngx-spine.component";
+import { NgxSpineWebglComponent } from "./ngx-spine-webgl.component";
 
-describe("NgxSpineComponent", () => {
-  let component: NgxSpineComponent;
-  let fixture: ComponentFixture<NgxSpineComponent>;
+describe("NgxSpineWebglComponent", () => {
+  let component: NgxSpineWebglComponent;
+  let fixture: ComponentFixture<NgxSpineWebglComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [NgxSpineComponent]
+      declarations: [NgxSpineWebglComponent]
     }).compileComponents();
   }));
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(NgxSpineComponent);
+    fixture = TestBed.createComponent(NgxSpineWebglComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

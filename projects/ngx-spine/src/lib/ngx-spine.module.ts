@@ -1,9 +1,9 @@
 import { NgModule } from "@angular/core";
-import { NgxSpineComponent } from "./ngx-spine.component";
+
+import { NgxSpineWebglComponent } from "./ngx-spine-webgl.component";
 
 @NgModule({
-  declarations: [NgxSpineComponent],
-  imports: [],
-  exports: [NgxSpineComponent]
+  declarations: [NgxSpineWebglComponent],
+  exports: [NgxSpineWebglComponent]
 })
 export class NgxSpineModule {}
