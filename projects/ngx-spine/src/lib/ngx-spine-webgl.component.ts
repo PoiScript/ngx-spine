@@ -4,9 +4,9 @@ import {
   EventEmitter,
   ViewChild,
   Component,
-  OnInit,
   ElementRef,
-  AfterViewInit
+  AfterViewInit,
+  ChangeDetectionStrategy
 } from "@angular/core";
 
 import {
@@ -39,21 +39,54 @@ interface Viewport {
   padBottom: string | number;
 }
 
+interface DataUrls {
+  /* the URL of the skeleton .json file */
+  json?: string;
+
+  /* the URL of the skeleton .skel file */
+  skel?: string;
+
+  /* the URL of the skeleton .atlas file. Atlas page images are automatically resolved. */
+  atlas: string;
+}
+
 @Component({
   selector: "ngx-spine-webgl",
   template: `
     <canvas class="ngx-spine-webgl" #canvas></canvas>
-  `
+`,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
-  /* the URL of the skeleton .json file */
-  @Input() jsonUrl: string;
+export class NgxSpineWebglComponent implements AfterViewInit {
+  private urls: DataUrls;
 
-  /* the URL of the skeleton .skel file */
-  @Input() skelUrl: string;
+  get dataUrls(): DataUrls {
+    return this.urls;
+  }
 
-  /* the URL of the skeleton .atlas file. Atlas page images are automatically resolved. */
-  @Input() atlasUrl: string;
+  @Input()
+  set dataUrls(urls: DataUrls) {
+    this.urls = urls;
+
+    if (!this.urls.json && !this.urls.skel) {
+      throw new Error(
+        "Please specify the URL of the skeleton JSON or .skel file."
+      );
+    }
+    if (!this.urls.atlas) {
+      throw new Error("Please specify the URL of the atlas file.");
+    }
+
+    if (this.init) {
+      this.loaded.emit(false);
+      this.loadAsset().then(() => {
+        console.log("load assets");
+        this.loadSkeleton();
+        this.loaded.emit(true);
+        requestAnimationFrame(() => this.drawFrame());
+      });
+    }
+  }
 
   /* Optional: the default mix time used to switch between two animations. */
   @Input() defaultMix = 0.25;
@@ -62,6 +95,8 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
   @Input() premultipliedAlpha = true;
 
   @Input() transitionTime = 0.2;
+
+  @Input() speed = 1;
 
   @ViewChild("canvas", { static: true, read: ElementRef })
   private canvas: ElementRef;
@@ -76,7 +111,7 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
     this.animationValue = val;
     this.animationChange.emit(val);
 
-    if (this.skeleton && this.animations.length > 0)  {
+    if (this.skeleton && this.animations.length > 0) {
       this.playTime = 0;
       this.setAnimation(val);
     }
@@ -111,7 +146,7 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
     this.skinValue = val;
     this.skinChange.emit(this.skinValue);
 
-    if (this.skeleton && this.animations.length > 0)  {
+    if (this.skeleton && this.animations.length > 0) {
       this.skeleton.setSkinByName(val);
       this.skeleton.setSlotsToSetupPose();
     }
@@ -138,8 +173,6 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
 
   @Output() loaded = new EventEmitter<boolean>();
 
-  @Input() speed = 1;
-
   private sceneRenderer: SceneRenderer;
   private context: ManagedWebGLRenderingContext;
   private assetManager: AssetManager;
@@ -151,41 +184,24 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
   private currentViewport: Viewport = null;
   private previousViewport: Viewport = null;
   private viewportTransitionStart = 0;
-
-  constructor() {}
-
-  ngOnInit() {
-    if (!this.jsonUrl && !this.skelUrl) {
-      throw new Error(
-        "Please specify the URL of the skeleton JSON or .skel file."
-      );
-    }
-    if (!this.atlasUrl) {
-      throw new Error("Please specify the URL of the atlas file.");
-    }
-  }
+  private init = false;
 
   ngAfterViewInit() {
     this.loaded.emit(false);
     // webgl setup
-    try {
-      this.context = new ManagedWebGLRenderingContext(
-        this.canvas.nativeElement,
-        { alpha: true }
-      );
-      this.sceneRenderer = new SceneRenderer(
-        this.canvas.nativeElement,
-        this.context,
-        true
-      );
-    } catch (e) {
-      throw new Error("");
-    }
-
-    console.log("webgl setup");
+    this.context = new ManagedWebGLRenderingContext(this.canvas.nativeElement, {
+      alpha: true
+    });
+    this.sceneRenderer = new SceneRenderer(
+      this.canvas.nativeElement,
+      this.context,
+      true
+    );
 
     // load the assets
     this.assetManager = new AssetManager(this.context);
+
+    this.init = true;
 
     this.loadAsset().then(() => {
       console.log("load assets");
@@ -199,19 +215,23 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
     const promises = [];
     promises.push(
       new Promise((resolve, reject) => {
-        this.assetManager.loadTextureAtlas(this.atlasUrl, resolve, reject);
+        this.assetManager.loadTextureAtlas(
+          this.dataUrls.atlas,
+          resolve,
+          reject
+        );
       })
     );
-    if (this.jsonUrl) {
+    if (this.dataUrls.json) {
       promises.push(
         new Promise((resolve, reject) => {
-          this.assetManager.loadText(this.jsonUrl, resolve, reject);
+          this.assetManager.loadText(this.dataUrls.json, resolve, reject);
         })
       );
     } else {
       promises.push(
         new Promise((resolve, reject) => {
-          this.assetManager.loadBinary(this.skelUrl, resolve, reject);
+          this.assetManager.loadBinary(this.dataUrls.skel, resolve, reject);
         })
       );
     }
@@ -219,23 +239,19 @@ export class NgxSpineWebglComponent implements OnInit, AfterViewInit {
   }
 
   private loadSkeleton() {
-    const atlas = this.assetManager.get(this.atlasUrl);
+    const atlas = this.assetManager.get(this.dataUrls.atlas);
     let skeletonData: SkeletonData;
 
-    try {
-      if (this.jsonUrl) {
-        const json = this.assetManager.get(this.jsonUrl);
-        const skeletonJson = new SkeletonJson(new AtlasAttachmentLoader(atlas));
-        skeletonData = skeletonJson.readSkeletonData(json);
-      } else {
-        const binary = this.assetManager.get(this.skelUrl);
-        const skeletonBinary = new SkeletonBinary(
-          new AtlasAttachmentLoader(atlas)
-        );
-        skeletonData = skeletonBinary.readSkeletonData(binary);
-      }
-    } catch (e) {
-      throw new Error("");
+    if (this.dataUrls.json) {
+      const json = this.assetManager.get(this.dataUrls.json);
+      const skeletonJson = new SkeletonJson(new AtlasAttachmentLoader(atlas));
+      skeletonData = skeletonJson.readSkeletonData(json);
+    } else {
+      const binary = this.assetManager.get(this.dataUrls.skel);
+      const skeletonBinary = new SkeletonBinary(
+        new AtlasAttachmentLoader(atlas)
+      );
+      skeletonData = skeletonBinary.readSkeletonData(binary);
     }
 
     this.skeleton = new Skeleton(skeletonData);

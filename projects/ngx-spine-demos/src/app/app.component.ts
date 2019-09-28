@@ -11,5 +11,17 @@ export class AppComponent {
   skin = null;
   skins = [];
   speed = 1;
-  spine = "spineboy-3-8";
+  spine = "spineboy-3-7";
+  dataUrls = {
+    atlas: "/assets/spineboy-3-7.atlas",
+    skel: "/assets/spineboy-3-7.skel"
+  };
+
+  selectSpine(spine: string) {
+    this.spine = spine;
+    this.dataUrls = {
+      atlas: `/assets/${spine}.atlas`,
+      skel: `/assets/${spine}.skel`
+    };
+  }
 }

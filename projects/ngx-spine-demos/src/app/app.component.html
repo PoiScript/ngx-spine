@@ -1,12 +1,11 @@
 <div class="main">
   <div class="display">
     <ngx-spine-webgl
-      atlasUrl="/assets/{{ spine }}.atlas"
-      skelUrl="/assets/{{ spine }}.skel"
       [(animation)]="animation"
       [(animations)]="animations"
       [(skin)]="skin"
       [(skins)]="skins"
+      [dataUrls]="dataUrls"
       [speed]="speed"
     ></ngx-spine-webgl>
   </div>
@@ -14,7 +13,10 @@
     <div>
       <mat-form-field>
         <div class="mat-caption">Spine</div>
-        <mat-select [(value)]="spine">
+        <mat-select
+          [value]="spine"
+          (selectionChange)="selectSpine($event.value)"
+        >
           <mat-option value="spineboy-3-8">spineboy (3.8.55)</mat-option>
           <mat-option value="spineboy-3-7">spineboy (3.7.90)</mat-option>
           <mat-option value="spineboy-3-6">spineboy (3.6.32)</mat-option>
