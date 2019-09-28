@@ -1,0 +1,23 @@
+mat-slider {
+  width: 180px;
+}
+
+.main {
+  display: flex;
+  flex-direction: row;
+}
+
+@media only screen and (max-width: 500px) {
+  .main {
+    flex-direction: column;
+  }
+}
+
+.display {
+  flex: 1 1 100%;
+}
+
+.control {
+  padding: 16px;
+  margin: 0 auto;
+}
