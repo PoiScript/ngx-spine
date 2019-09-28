@@ -1,6 +1,12 @@
 {
   "name": "ngx-spine",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "author": "PoiScript <poiscript@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PoiScript/ngx-spine.git"
+  },
+  "license": "MIT",
   "peerDependencies": {
     "@angular/common": "^8.2.8",
     "@angular/core": "^8.2.8"

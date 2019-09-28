@@ -7,7 +7,8 @@
     "build": "ng build",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "packagr": "ng build ngx-spine && cp SPINE-LICENSE dist/ngx-spine/"
   },
   "private": true,
   "dependencies": {
