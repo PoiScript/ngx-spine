@@ -139,6 +139,10 @@ export class SkeletonBinary {
       return new SkeletonBinary36(this.attachmentLoader).readSkeletonData(
         binary
       );
+    } else if (version.startsWith("3.7")) {
+      return new SkeletonBinary37(this.attachmentLoader).readSkeletonData(
+        binary
+      );
     }
 
     let skeletonData = new SkeletonData();
@@ -158,8 +162,6 @@ export class SkeletonBinary {
       skeletonData.imagesPath = input.readString();
       skeletonData.audioPath = input.readString();
     }
-
-    console.log(skeletonData);
 
     let n = 0;
     // Strings.
@@ -1029,6 +1031,613 @@ export class SkeletonBinary {
   }
 }
 
+class SkeletonBinary37 extends SkeletonBinary {
+  readSkeletonData(binary: Uint8Array): SkeletonData {
+    let scale = this.scale;
+
+    let input = new BinaryInput(binary);
+    let hash = input.readString();
+    let version = input.readString();
+
+    let skeletonData = new SkeletonData();
+    skeletonData.name = ""; // BOZO
+
+    skeletonData.hash = hash;
+    skeletonData.version = version;
+    skeletonData.width = input.readFloat();
+    skeletonData.height = input.readFloat();
+
+    let nonessential = input.readBoolean();
+    if (nonessential) {
+      skeletonData.fps = input.readFloat();
+
+      skeletonData.imagesPath = input.readString();
+      skeletonData.audioPath = input.readString();
+    }
+
+    let n = 0;
+    // Bones.
+    n = input.readInt(true);
+
+    for (let i = 0; i < n; i++) {
+      let name = input.readString();
+
+      let parent = i == 0 ? null : skeletonData.bones[input.readInt(true)];
+      let data = new BoneData(i, name, parent);
+      data.rotation = input.readFloat();
+      data.x = input.readFloat() * scale;
+      data.y = input.readFloat() * scale;
+      data.scaleX = input.readFloat();
+      data.scaleY = input.readFloat();
+      data.shearX = input.readFloat();
+      data.shearY = input.readFloat();
+      data.length = input.readFloat() * scale;
+      data.transformMode =
+        SkeletonBinary.TransformModeValues[input.readInt(true)];
+      if (nonessential) Color.rgba8888ToColor(data.color, input.readInt32());
+      skeletonData.bones.push(data);
+    }
+
+    // Slots.
+    n = input.readInt(true);
+    for (let i = 0; i < n; i++) {
+      let slotName = input.readString();
+      let boneData = skeletonData.bones[input.readInt(true)];
+      let data = new SlotData(i, slotName, boneData);
+      Color.rgba8888ToColor(data.color, input.readInt32());
+
+      let darkColor = input.readInt32();
+      if (darkColor != -1)
+        Color.rgb888ToColor((data.darkColor = new Color()), darkColor);
+
+      data.attachmentName = input.readString();
+      data.blendMode = SkeletonBinary.BlendModeValues[input.readInt(true)];
+      skeletonData.slots.push(data);
+    }
+
+    // IK constraints.
+    n = input.readInt(true);
+    for (let i = 0, nn; i < n; i++) {
+      let data = new IkConstraintData(input.readString());
+      data.order = input.readInt(true);
+      nn = input.readInt(true);
+      for (let ii = 0; ii < nn; ii++)
+        data.bones.push(skeletonData.bones[input.readInt(true)]);
+      data.target = skeletonData.bones[input.readInt(true)];
+      data.mix = input.readFloat();
+      data.bendDirection = input.readByte();
+      data.compress = input.readBoolean();
+      data.stretch = input.readBoolean();
+      data.uniform = input.readBoolean();
+      skeletonData.ikConstraints.push(data);
+    }
+
+    // Transform constraints.
+    n = input.readInt(true);
+    for (let i = 0, nn; i < n; i++) {
+      let data = new TransformConstraintData(input.readString());
+      data.order = input.readInt(true);
+      nn = input.readInt(true);
+      for (let ii = 0; ii < nn; ii++)
+        data.bones.push(skeletonData.bones[input.readInt(true)]);
+      data.target = skeletonData.bones[input.readInt(true)];
+      data.local = input.readBoolean();
+      data.relative = input.readBoolean();
+      data.offsetRotation = input.readFloat();
+      data.offsetX = input.readFloat() * scale;
+      data.offsetY = input.readFloat() * scale;
+      data.offsetScaleX = input.readFloat();
+      data.offsetScaleY = input.readFloat();
+      data.offsetShearY = input.readFloat();
+      data.rotateMix = input.readFloat();
+      data.translateMix = input.readFloat();
+      data.scaleMix = input.readFloat();
+      data.shearMix = input.readFloat();
+      skeletonData.transformConstraints.push(data);
+    }
+
+    // Path constraints.
+    n = input.readInt(true);
+    for (let i = 0, nn; i < n; i++) {
+      let data = new PathConstraintData(input.readString());
+      data.order = input.readInt(true);
+      nn = input.readInt(true);
+      for (let ii = 0; ii < nn; ii++)
+        data.bones.push(skeletonData.bones[input.readInt(true)]);
+      data.target = skeletonData.slots[input.readInt(true)];
+      data.positionMode =
+        SkeletonBinary.PositionModeValues[input.readInt(true)];
+      data.spacingMode = SkeletonBinary.SpacingModeValues[input.readInt(true)];
+      data.rotateMode = SkeletonBinary.RotateModeValues[input.readInt(true)];
+      data.offsetRotation = input.readFloat();
+      data.position = input.readFloat();
+      if (data.positionMode == PositionMode.Fixed) data.position *= scale;
+      data.spacing = input.readFloat();
+      if (
+        data.spacingMode == SpacingMode.Length ||
+        data.spacingMode == SpacingMode.Fixed
+      )
+        data.spacing *= scale;
+      data.rotateMix = input.readFloat();
+      data.translateMix = input.readFloat();
+      skeletonData.pathConstraints.push(data);
+    }
+
+    // Default skin.
+    let defaultSkin = this.readSkin(input, skeletonData, true, nonessential);
+    if (defaultSkin != null) {
+      skeletonData.defaultSkin = defaultSkin;
+      skeletonData.skins.push(defaultSkin);
+    }
+
+    // Skins.
+    {
+      let i = skeletonData.skins.length;
+      Utils.setArraySize(skeletonData.skins, (n = i + input.readInt(true)));
+      for (; i < n; i++)
+        skeletonData.skins[i] = this.readSkin(
+          input,
+          skeletonData,
+          false,
+          nonessential
+        );
+    }
+
+    // Linked meshes.
+    n = this.linkedMeshes.length;
+    for (let i = 0; i < n; i++) {
+      let linkedMesh = this.linkedMeshes[i];
+      let skin =
+        linkedMesh.skin == null
+          ? skeletonData.defaultSkin
+          : skeletonData.findSkin(linkedMesh.skin);
+      if (skin == null) throw new Error("Skin not found: " + linkedMesh.skin);
+      let parent = skin.getAttachment(linkedMesh.slotIndex, linkedMesh.parent);
+      if (parent == null)
+        throw new Error("Parent mesh not found: " + linkedMesh.parent);
+      linkedMesh.mesh.deformAttachment = linkedMesh.inheritDeform
+        ? (parent as VertexAttachment)
+        : linkedMesh.mesh;
+      linkedMesh.mesh.setParentMesh(parent as MeshAttachment);
+      linkedMesh.mesh.updateUVs();
+    }
+    this.linkedMeshes.length = 0;
+
+    // Events.
+    n = input.readInt(true);
+    for (let i = 0; i < n; i++) {
+      let data = new EventData(input.readString());
+      data.intValue = input.readInt(false);
+      data.floatValue = input.readFloat();
+      data.stringValue = input.readString();
+      data.audioPath = input.readString();
+      if (data.audioPath != null) {
+        data.volume = input.readFloat();
+        data.balance = input.readFloat();
+      }
+      skeletonData.events.push(data);
+    }
+
+    // Animations.
+    n = input.readInt(true);
+    for (let i = 0; i < n; i++)
+      skeletonData.animations.push(
+        this.readAnimation(input, input.readString(), skeletonData)
+      );
+    return skeletonData;
+  }
+
+  protected readSkin(
+    input: BinaryInput,
+    skeletonData: SkeletonData,
+    defaultSkin: boolean,
+    nonessential: boolean
+  ): Skin {
+    let skin = new Skin(defaultSkin ? "default" : input.readString());
+
+    let slotCount = input.readInt(true);
+
+    if (slotCount == 0) return null;
+
+    for (let i = 0; i < slotCount; i++) {
+      let slotIndex = input.readInt(true);
+      for (let ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+        let name = input.readString();
+        let attachment = this.readAttachment(
+          input,
+          skeletonData,
+          skin,
+          slotIndex,
+          name,
+          nonessential
+        );
+        if (attachment != null) skin.setAttachment(slotIndex, name, attachment);
+      }
+    }
+
+    return skin;
+  }
+
+  protected readAnimation(
+    input: BinaryInput,
+    name: string,
+    skeletonData: SkeletonData
+  ): Animation {
+    let timelines = new Array<Timeline>();
+    let scale = this.scale;
+    let duration = 0;
+    let tempColor1 = new Color();
+    let tempColor2 = new Color();
+
+    // Slot timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let slotIndex = input.readInt(true);
+      for (let ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+        let timelineType = input.readByte();
+        let frameCount = input.readInt(true);
+        switch (timelineType) {
+          case SkeletonBinary.SLOT_ATTACHMENT: {
+            let timeline = new AttachmentTimeline(frameCount);
+            timeline.slotIndex = slotIndex;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++)
+              timeline.setFrame(
+                frameIndex,
+                input.readFloat(),
+                input.readString()
+              );
+            timelines.push(timeline);
+            duration = Math.max(duration, timeline.frames[frameCount - 1]);
+            break;
+          }
+          case SkeletonBinary.SLOT_COLOR: {
+            let timeline = new ColorTimeline(frameCount);
+            timeline.slotIndex = slotIndex;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              let time = input.readFloat();
+              Color.rgba8888ToColor(tempColor1, input.readInt32());
+              timeline.setFrame(
+                frameIndex,
+                time,
+                tempColor1.r,
+                tempColor1.g,
+                tempColor1.b,
+                tempColor1.a
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[(frameCount - 1) * ColorTimeline.ENTRIES]
+            );
+            break;
+          }
+          case SkeletonBinary.SLOT_TWO_COLOR: {
+            let timeline = new TwoColorTimeline(frameCount);
+            timeline.slotIndex = slotIndex;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              let time = input.readFloat();
+              Color.rgba8888ToColor(tempColor1, input.readInt32());
+              Color.rgb888ToColor(tempColor2, input.readInt32());
+              timeline.setFrame(
+                frameIndex,
+                time,
+                tempColor1.r,
+                tempColor1.g,
+                tempColor1.b,
+                tempColor1.a,
+                tempColor2.r,
+                tempColor2.g,
+                tempColor2.b
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[(frameCount - 1) * TwoColorTimeline.ENTRIES]
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    // Bone timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let boneIndex = input.readInt(true);
+      for (let ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+        let timelineType = input.readByte();
+        let frameCount = input.readInt(true);
+        switch (timelineType) {
+          case SkeletonBinary.BONE_ROTATE: {
+            let timeline = new RotateTimeline(frameCount);
+            timeline.boneIndex = boneIndex;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              timeline.setFrame(
+                frameIndex,
+                input.readFloat(),
+                input.readFloat()
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[(frameCount - 1) * RotateTimeline.ENTRIES]
+            );
+            break;
+          }
+          case SkeletonBinary.BONE_TRANSLATE:
+          case SkeletonBinary.BONE_SCALE:
+          case SkeletonBinary.BONE_SHEAR: {
+            let timeline;
+            let timelineScale = 1;
+            if (timelineType == SkeletonBinary.BONE_SCALE)
+              timeline = new ScaleTimeline(frameCount);
+            else if (timelineType == SkeletonBinary.BONE_SHEAR)
+              timeline = new ShearTimeline(frameCount);
+            else {
+              timeline = new TranslateTimeline(frameCount);
+              timelineScale = scale;
+            }
+            timeline.boneIndex = boneIndex;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              timeline.setFrame(
+                frameIndex,
+                input.readFloat(),
+                input.readFloat() * timelineScale,
+                input.readFloat() * timelineScale
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[(frameCount - 1) * TranslateTimeline.ENTRIES]
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    // IK constraint timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let index = input.readInt(true);
+      let frameCount = input.readInt(true);
+      let timeline = new IkConstraintTimeline(frameCount);
+      timeline.ikConstraintIndex = index;
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+        timeline.setFrame(
+          frameIndex,
+          input.readFloat(),
+          input.readFloat(),
+          1, // softness
+          input.readByte(),
+          input.readBoolean(),
+          input.readBoolean()
+        );
+        if (frameIndex < frameCount - 1)
+          this.readCurve(input, frameIndex, timeline);
+      }
+      timelines.push(timeline);
+      duration = Math.max(
+        duration,
+        timeline.frames[(frameCount - 1) * IkConstraintTimeline.ENTRIES]
+      );
+    }
+
+    // Transform constraint timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let index = input.readInt(true);
+      let frameCount = input.readInt(true);
+      let timeline = new TransformConstraintTimeline(frameCount);
+      timeline.transformConstraintIndex = index;
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+        timeline.setFrame(
+          frameIndex,
+          input.readFloat(),
+          input.readFloat(),
+          input.readFloat(),
+          input.readFloat(),
+          input.readFloat()
+        );
+        if (frameIndex < frameCount - 1)
+          this.readCurve(input, frameIndex, timeline);
+      }
+      timelines.push(timeline);
+      duration = Math.max(
+        duration,
+        timeline.frames[(frameCount - 1) * TransformConstraintTimeline.ENTRIES]
+      );
+    }
+
+    // Path constraint timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let index = input.readInt(true);
+      let data = skeletonData.pathConstraints[index];
+      for (let ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+        let timelineType = input.readByte();
+        let frameCount = input.readInt(true);
+        switch (timelineType) {
+          case SkeletonBinary.PATH_POSITION:
+          case SkeletonBinary.PATH_SPACING: {
+            let timeline;
+            let timelineScale = 1;
+            if (timelineType == SkeletonBinary.PATH_SPACING) {
+              timeline = new PathConstraintSpacingTimeline(frameCount);
+              if (
+                data.spacingMode == SpacingMode.Length ||
+                data.spacingMode == SpacingMode.Fixed
+              )
+                timelineScale = scale;
+            } else {
+              timeline = new PathConstraintPositionTimeline(frameCount);
+              if (data.positionMode == PositionMode.Fixed)
+                timelineScale = scale;
+            }
+            timeline.pathConstraintIndex = index;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              timeline.setFrame(
+                frameIndex,
+                input.readFloat(),
+                input.readFloat() * timelineScale
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[
+                (frameCount - 1) * PathConstraintPositionTimeline.ENTRIES
+              ]
+            );
+            break;
+          }
+          case SkeletonBinary.PATH_MIX: {
+            let timeline = new PathConstraintMixTimeline(frameCount);
+            timeline.pathConstraintIndex = index;
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+              timeline.setFrame(
+                frameIndex,
+                input.readFloat(),
+                input.readFloat(),
+                input.readFloat()
+              );
+              if (frameIndex < frameCount - 1)
+                this.readCurve(input, frameIndex, timeline);
+            }
+            timelines.push(timeline);
+            duration = Math.max(
+              duration,
+              timeline.frames[
+                (frameCount - 1) * PathConstraintMixTimeline.ENTRIES
+              ]
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    // Deform timelines.
+    for (let i = 0, n = input.readInt(true); i < n; i++) {
+      let skin = skeletonData.skins[input.readInt(true)];
+      for (let ii = 0, nn = input.readInt(true); ii < nn; ii++) {
+        let slotIndex = input.readInt(true);
+        for (let iii = 0, nnn = input.readInt(true); iii < nnn; iii++) {
+          let attachment = skin.getAttachment(
+            slotIndex,
+            input.readString()
+          ) as VertexAttachment;
+          let weighted = attachment.bones != null;
+          let vertices = attachment.vertices;
+          let deformLength = weighted
+            ? (vertices.length / 3) * 2
+            : vertices.length;
+
+          let frameCount = input.readInt(true);
+          let timeline = new DeformTimeline(frameCount);
+          timeline.slotIndex = slotIndex;
+          timeline.attachment = attachment;
+
+          for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+            let time = input.readFloat();
+            let deform;
+            let end = input.readInt(true);
+            if (end == 0)
+              deform = weighted ? Utils.newFloatArray(deformLength) : vertices;
+            else {
+              deform = Utils.newFloatArray(deformLength);
+              let start = input.readInt(true);
+              end += start;
+              if (scale == 1) {
+                for (let v = start; v < end; v++) deform[v] = input.readFloat();
+              } else {
+                for (let v = start; v < end; v++)
+                  deform[v] = input.readFloat() * scale;
+              }
+              if (!weighted) {
+                for (let v = 0, vn = deform.length; v < vn; v++)
+                  deform[v] += vertices[v];
+              }
+            }
+
+            timeline.setFrame(frameIndex, time, deform);
+            if (frameIndex < frameCount - 1)
+              this.readCurve(input, frameIndex, timeline);
+          }
+          timelines.push(timeline);
+          duration = Math.max(duration, timeline.frames[frameCount - 1]);
+        }
+      }
+    }
+
+    // Draw order timeline.
+    let drawOrderCount = input.readInt(true);
+    if (drawOrderCount > 0) {
+      let timeline = new DrawOrderTimeline(drawOrderCount);
+      let slotCount = skeletonData.slots.length;
+      for (let i = 0; i < drawOrderCount; i++) {
+        let time = input.readFloat();
+        let offsetCount = input.readInt(true);
+        let drawOrder = Utils.newArray(slotCount, 0);
+        for (let ii = slotCount - 1; ii >= 0; ii--) drawOrder[ii] = -1;
+        let unchanged = Utils.newArray(slotCount - offsetCount, 0);
+        let originalIndex = 0,
+          unchangedIndex = 0;
+        for (let ii = 0; ii < offsetCount; ii++) {
+          let slotIndex = input.readInt(true);
+          // Collect unchanged items.
+          while (originalIndex != slotIndex)
+            unchanged[unchangedIndex++] = originalIndex++;
+          // Set changed items.
+          drawOrder[originalIndex + input.readInt(true)] = originalIndex++;
+        }
+        // Collect remaining unchanged items.
+        while (originalIndex < slotCount)
+          unchanged[unchangedIndex++] = originalIndex++;
+        // Fill in unchanged items.
+        for (let ii = slotCount - 1; ii >= 0; ii--)
+          if (drawOrder[ii] == -1) drawOrder[ii] = unchanged[--unchangedIndex];
+        timeline.setFrame(i, time, drawOrder);
+      }
+      timelines.push(timeline);
+      duration = Math.max(duration, timeline.frames[drawOrderCount - 1]);
+    }
+
+    // Event timeline.
+    let eventCount = input.readInt(true);
+    if (eventCount > 0) {
+      let timeline = new EventTimeline(eventCount);
+      for (let i = 0; i < eventCount; i++) {
+        let time = input.readFloat();
+        let eventData = skeletonData.events[input.readInt(true)];
+        let event = new Event(time, eventData);
+        event.intValue = input.readInt(false);
+        event.floatValue = input.readFloat();
+        event.stringValue = input.readBoolean()
+          ? input.readString()
+          : eventData.stringValue;
+        if (event.data.audioPath != null) {
+          event.volume = input.readFloat();
+          event.balance = input.readFloat();
+        }
+        timeline.setFrame(i, event);
+      }
+      timelines.push(timeline);
+      duration = Math.max(duration, timeline.frames[eventCount - 1]);
+    }
+
+    return new Animation(name, timelines, duration);
+  }
+}
 
 class SkeletonBinary36 extends SkeletonBinary {
   readSkeletonData(binary: Uint8Array): SkeletonData {
@@ -1139,8 +1748,7 @@ class SkeletonBinary36 extends SkeletonBinary {
       data.target = skeletonData.slots[input.readInt(true)];
       data.positionMode =
         SkeletonBinary.PositionModeValues[input.readInt(true)];
-      data.spacingMode =
-        SkeletonBinary.SpacingModeValues[input.readInt(true)];
+      data.spacingMode = SkeletonBinary.SpacingModeValues[input.readInt(true)];
       data.rotateMode = SkeletonBinary.RotateModeValues[input.readInt(true)];
       data.offsetRotation = input.readFloat();
       data.position = input.readFloat();
@@ -1179,7 +1787,7 @@ class SkeletonBinary36 extends SkeletonBinary {
     // Events.
     n = input.readInt(true);
     for (let i = 0; i < n; i++) {
-      let data = new EventData(input.readStringRef());
+      let data = new EventData(input.readString());
       data.intValue = input.readInt(false);
       data.floatValue = input.readFloat();
       data.stringValue = input.readString();
