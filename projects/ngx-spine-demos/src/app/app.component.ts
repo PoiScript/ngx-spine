@@ -6,5 +6,10 @@ import { Component } from "@angular/core";
   styleUrls: ["./app.component.css"]
 })
 export class AppComponent {
-  title = "ngx-spine-demos";
+  animation = null;
+  animations = [];
+  skin = null;
+  skins = [];
+  speed = 1;
+  spine = "spineboy-3-8";
 }
